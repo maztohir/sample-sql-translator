@@ -342,10 +342,11 @@ class SQLIN(SQLExpr):
     def sqlf(self, compact):
         in_vals = []
         for arg in self.args[:-1]:
-            in_vals.append(LB([arg.sqlf(True), TB(',')]))
+            in_vals += [arg.sqlf(True), TB(',')]
         in_vals.append(self.args[-1].sqlf(True))
+        in_vals = [LB(in_vals)]
         sql_op = TB(' ' + self.sql_op + ' (')
-        compact_sql = LB([self.iexpr.sqlf(True), sql_op] + in_vals +
+        compact_sql = LB([self.iexpr.sqlf(True), sql_op] + in_vals + 
                          [TB(')')])
         if compact:
             return compact_sql
