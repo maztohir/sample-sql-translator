@@ -12,7 +12,7 @@ import copy
 
 class Refactor:
 
-    COMMENT_COLUMN_NOT_FOUND = "[WARNING] Could not find column in knowledge: {}"
+    COMMENT_COLUMN_NOT_FOUND = "[WARNING] Could not find column in knowledge: {}/{}"
     COMMENT_TABLE_NOT_FOUND = "[WARNING] Could not find table in knowledge: {}"
 
     def __init__(self, knowledge:dict):
@@ -297,7 +297,7 @@ class Refactor:
             old_column_name = parsed.expr.names[-1].value
 
             if old_column_name not in column_knowledge.keys():
-                parsed.comments.append(self.COMMENT_COLUMN_NOT_FOUND.format(old_column_name))
+                parsed.comments.append(self.COMMENT_COLUMN_NOT_FOUND.format(",".join(relevant_tables.keys()), old_column_name))
                 return
                 
             new_column_name_path = column_knowledge[old_column_name].split('.')

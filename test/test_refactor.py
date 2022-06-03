@@ -98,7 +98,7 @@ class TestRefactor(unittest.TestCase):
         reference = """
         SELECT 
             new_column_1 AS column_1, 
-            -- [WARNING] Could not find column in knowledge: column_0
+            -- [WARNING] Could not find column in knowledge: table_a/column_0
             column_0
         FROM new_table_a
         """
