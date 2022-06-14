@@ -1,3 +1,13 @@
+
+import os
+import sys
+  
+# directory reach
+directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+  
+# setting path
+sys.path.append(directory)
+
 import unittest
 from sql_refactor import Refactor
 
@@ -520,6 +530,17 @@ class TestRefactor(unittest.TestCase):
         )
         SELECT column_1, column_2
         FROM ta
+        """
+
+        self._assert_equal_sql(sql, reference)
+
+    def test_date_without_bracket(self):
+        sql = """
+        SELECT date '2022-02-01'
+        """
+
+        reference = """
+        SELECT date('2022-02-01')
         """
 
         self._assert_equal_sql(sql, reference)

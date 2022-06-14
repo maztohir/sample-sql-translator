@@ -360,6 +360,9 @@ class SQLExprWithAnalytic(SQLExpr):
 
             # Turn it into a function
             expr = SQLFuncExpr(expr.names, SQLNodeList(func_args))
+        elif isinstance(expr, SQLIdentifierPath) and len(expr.names)==1 and expr.names[0].value.upper() == 'DATE' and (lex.peek('\'') or lex.peek('"')):
+            func_args = [SQLExpr.parse(lex)]
+            expr = SQLFuncExpr(expr.names, SQLNodeList(func_args))
 
         window = SQLAnalytic.consume(lex)
         if window:
