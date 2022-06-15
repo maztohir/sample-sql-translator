@@ -116,7 +116,10 @@ class Refactor:
         while True:
             if index == len(parsed.fields):
                 break
-            field = parsed.fields[index]
+            if len(parsed.fields):
+                field = parsed.fields[index]
+            else:
+                break
             
             # Wildcard
             if isinstance(field.expr, SQLWildcardPath):
@@ -169,11 +172,14 @@ class Refactor:
                             ]
                 
                 # Insert new column list from wildcard to fields
-                if index == 0:
+                if len(columns) == 0:
+                    pass
+                elif index == 0:
                     parsed.fields = SQLNodeList(columns) + parsed.fields[index+1:]
                 else:
                     parsed.fields = parsed.fields[:index] + SQLNodeList(columns) + parsed.fields[index+1:]
-                field = parsed.fields[index]
+                if len(parsed.fields):
+                    field = parsed.fields[index]
 
             # Identifier Path
             self._refactor(field, old_tables)
@@ -216,7 +222,7 @@ class Refactor:
             for field in select_statement.fields:
                 if field.alias:
                     column_knowledge[field.alias.alias.value] = None
-                else:
+                elif field.expr.names and len(field.expr.names)>0:
                     column_knowledge[field.expr.names[-1].value] = None
             additional_knowledge = {
                 table_name : {
@@ -281,6 +287,8 @@ class Refactor:
         if isinstance(parsed.expr, SQLIdentifierPath):
             if len(tables) == 0: # no tables found in knowledge
                 return
+            if isinstance(parsed.expr, SQLWildcardPath):
+                return
 
             first_name = parsed.expr.names[0].value
             relevant_tables = tables
@@ -324,7 +332,9 @@ class Refactor:
     def _refactor_identifier_path(self, parsed:SQLIdentifierPath, tables):
         if tables is None:
             return
-        
+        if isinstance(parsed, SQLWildcardPath):
+            return
+
         first_name = parsed.names[0].value
         relevant_tables = tables
 
@@ -431,7 +441,7 @@ class Refactor:
         for table, alias in tables.items():
             if table not in self._knowledge.keys():
                 continue
-            column_knowledge_from_table = copy.copy(self._knowledge[table]['column_knowledge'])
+            column_knowledge_from_table = dict(filter(lambda elem: elem[0] and elem[0] != '', self._knowledge[table]['column_knowledge'].items()))
             if self._knowledge[table]['preserved']:
                 column_knowledge_from_table = {
                                                 old_column : old_column
