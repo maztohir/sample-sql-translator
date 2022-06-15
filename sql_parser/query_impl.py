@@ -545,7 +545,7 @@ class SQLJoin(SQLNode):
             if expr.sql_op == '=':
                 left = expr.left
                 names = left.names   
-                left.names = SQLNodeList([alias.alias]) + names
+                left.names = names if alias is None else (SQLNodeList([alias.alias]) + names)
                 break
             elif expr.sql_op == 'AND':
                 right_expr = expr.right
