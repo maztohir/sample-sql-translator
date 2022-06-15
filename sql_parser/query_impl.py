@@ -291,6 +291,8 @@ class SQLSelect(SQLQuery):
             from_consumed = lex.consume('FROM')
             if from_consumed:
                 break
+            if lex.peek_end() or lex.peek(')'):
+                break
 
         from_tables = (from_consumed or lex.consume('FROM')) and SQLFrom.parse(lex)
         where_expr = lex.consume('WHERE') and SQLExpr.parse(lex)
