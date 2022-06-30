@@ -144,8 +144,14 @@ class SQLBiOp(SQLExpr):
                 expr = SQLBetween(inverted + 'BETWEEN',
                                   expr, expr_l, expr_r)
             elif lex.consume('IN'):
-                lex.expect('(')
-                in_query = SQLQuery.consume(lex)
+                if lex.consume(['UNNEST', '(']):
+                    from .expr_funcs import SQLFuncExpr
+                    from .ident import SQLIdentifier, SQLIdentifierPath
+                    arg = SQLFuncExpr.parse(lex) or SQLIdentifierPath.parse(lex) 
+                    in_query = SQLFuncExpr(SQLNodeList([SQLIdentifier('UNNEST')]), SQLNodeList([arg]))
+                else:
+                    lex.expect('(')
+                    in_query = SQLQuery.consume(lex)
                 if in_query:
                     lex.expect(')')
                     return SQLINSQL(inverted + 'IN', expr, in_query)
