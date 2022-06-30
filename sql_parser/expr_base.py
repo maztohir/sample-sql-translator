@@ -44,7 +44,7 @@ class SQLArrayLiteral(SQLExpr):
     type: Optional[SQLType]
 
     def sqlf(self, compact):
-        if type is None:
+        if not self.type:
             compact_sql = LB([
                 TB('['),
                 LB(with_commas(True, self.args)),
@@ -88,7 +88,7 @@ class SQLArrayLiteral(SQLExpr):
         if lex.consume(['ARRAY', '<']):
             type = SQLType.consume(lex)
             lex.consume('>')
-        if not lex.consume('['):
+        if not lex.consume_any([['ARRAY', '['],'[']):
             return None
         exprs: List[SQLExpr] = []
         while True:
@@ -206,7 +206,9 @@ class SQLArrayAgg(SQLExpr):
         order_limit_offset = None
         analytic = None
 
-        if lex.peek('STRUCT'):
+            
+        expr = SQLCustomFuncs.consume(lex)
+        if not expr and lex.peek('STRUCT'):
             type = SQLStruct.consume(lex)
             lex.expect('(')
             exprs : List[SQLExpr] = []
@@ -216,7 +218,7 @@ class SQLArrayAgg(SQLExpr):
                     break
                 lex.expect(',')
             expr = SQLStructOp(SQLNodeList(exprs))
-        else:
+        elif not expr:
             is_distinct = bool(lex.consume('DISTINCT'))
 
             expr = SQLExpr.parse(lex)
