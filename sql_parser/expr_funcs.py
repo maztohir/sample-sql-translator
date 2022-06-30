@@ -71,7 +71,7 @@ class SQLCustomFuncs(SQLExpr):
         return (SQLCAST.consume(lex) or
                 SQLDate.consume(lex) or
                 SQLTime.consume(lex) or
-                SQLCount.consume(lex) or
+                SQLAggregateFuncion.consume(lex) or
                 SQLExists.consume(lex) or
                 SQLInterval.consume(lex) or
                 SQLAnalyticNavigation.consume(lex) or
@@ -105,26 +105,30 @@ class SQLExists(SQLCustomFuncs):
 
 
 @dataclass(frozen=True)
-class SQLCount(SQLCustomFuncs):
+class SQLAggregateFuncion(SQLCustomFuncs):
+    FUNCTIONS = ['COUNT', 'COUNTIF', 'SUM', 'MIN', 'MAX', 'AVG']
+    name: str
     isdistinct: bool
     expr: SQLExpr
 
     def sqlf(self, compact):
         return LB([
-            TB('COUNT(' + ('DISTINCT ' if self.isdistinct else '')),
+            TB(f'{self.name}(' + ('DISTINCT ' if self.isdistinct else '')),
             self.expr.sqlf(compact),
             TB(')'),
         ])
 
     @staticmethod
-    def consume(lex) -> 'Optional[SQLCount]':
-        if not lex.consume(['COUNT', '(']):
+    def consume(lex) -> 'Optional[SQLAggregateFuncion]':
+        to_consumed = [[func, '('] for func in SQLAggregateFuncion.FUNCTIONS]
+        consumed_function = lex.consume_any(to_consumed)
+        if not consumed_function:
             return None
-        # lex.expect('(')
+        name = consumed_function[0]
         isdistinct = bool(lex.consume('DISTINCT'))
         expr = SQLExpr.parse(lex)
         lex.expect(')')
-        return SQLCount(isdistinct, expr)
+        return SQLAggregateFuncion(name, isdistinct, expr)
 
 
 @dataclass(frozen=True)
