@@ -4,7 +4,7 @@ from sql_parser.ident import SQLIdentifier, SQLIdentifierPath, SQLWildcardPath
 from sql_parser.query import SQLAlias, SQLNamedTable
 from sql_parser.node import SQLNode, SQLNodeList
 from sql_parser.query_impl import SQLField, SQLFrom, SQLJoin, SQLOrderedQuery, SQLSelect, SQLSetOp, SQLSubSelect, SQLWithSelect
-
+from sql_parser.lexer import ParsingError
 from sql_parser import parse
 
 import copy
@@ -30,13 +30,25 @@ class Refactor:
     def refactor(self, sql, parse_only=False):
         self.parsed = []
         sql_commands = sql.strip('\n').split(';')
+        prev_command = ''
+        error = None
         for command in sql_commands:
             if command in ('', '\n'):
                 continue
-            parsed = parse(command)
-            self.parsed.append(parsed)
-            if not parse_only:
-                self._refactor(parsed)
+            try:
+                command = prev_command + command
+                parsed = parse(command)
+                self.parsed.append(parsed)
+                if not parse_only:
+                    self._refactor(parsed)
+                prev_command = ''
+                error = None
+            except ParsingError as e:
+                prev_command = command + ';'
+                error = e
+        if error:
+            raise error
+
 
     def _refactor(self, parsed, tables=None):
         if isinstance(parsed, SQLWithSelect):
