@@ -35,30 +35,59 @@ from .ident import SQLIdentifierPath
 from .node import SQLNode
 from .node import SQLNodeList
 from .expr_funcs import SQLFuncExpr, SQLCustomFuncs
-
+from .types import SQLStruct, SQLType
+from .expr_op import SQLStruct as SQLStructOp
 
 @dataclass(frozen=True)
 class SQLArrayLiteral(SQLExpr):
     args: SQLNodeList
+    type: Optional[SQLType]
 
     def sqlf(self, compact):
-        compact_sql = LB([
-            TB('['),
-            LB(with_commas(True, self.args)),
-            TB(']')
-        ])
-        if compact:
-            return compact_sql
-        return CB([
-            compact_sql,
-            LB([
+        if type is None:
+            compact_sql = LB([
                 TB('['),
-                WB(with_commas(compact, self.args, tail=']'))
-            ]),
-        ])
+                LB(with_commas(True, self.args)),
+                TB(']')
+            ])
+            if compact:
+                return compact_sql
+            return CB([
+                compact_sql,
+                LB([
+                    TB('['),
+                    WB(with_commas(compact, self.args, tail=']'))
+                ]),
+            ])
+        else:
+            start_arg_parenthesis = '['
+            end_arg_parenthesis = ']'
+            compact_sql = LB([
+                TB('ARRAY<'),
+                self.type.sqlf(compact=False),
+                TB('>'),
+                TB(start_arg_parenthesis),
+                LB(with_commas(True, self.args)),
+                TB(end_arg_parenthesis)
+            ])
+            if compact:
+                return compact_sql
+            return CB([
+                SB([
+                    LB([TB('ARRAY<'),
+                    self.type.sqlf(compact=False),
+                    TB('>')]),
+                WB([TB(start_arg_parenthesis)] +
+                    with_commas(compact, self.args, tail=end_arg_parenthesis))
+                ]),
+            ])
 
     @staticmethod
     def consume(lex) -> 'Optional[SQLArrayLiteral]':
+        type : SQLType = None
+        if lex.consume(['ARRAY', '<']):
+            type = SQLType.consume(lex)
+            lex.consume('>')
         if not lex.consume('['):
             return None
         exprs: List[SQLExpr] = []
@@ -67,8 +96,7 @@ class SQLArrayLiteral(SQLExpr):
             if not lex.consume(','):
                 break
         lex.expect(']')
-        return SQLArrayLiteral(SQLNodeList(exprs))
-
+        return SQLArrayLiteral(SQLNodeList(exprs), type)
 
 @dataclass(frozen=True)
 class SQLArraySelect(SQLExpr):
@@ -105,7 +133,8 @@ class SQLArraySelect(SQLExpr):
 @dataclass(frozen=True)
 class SQLArrayAgg(SQLExpr):
     is_distinct: bool
-    expr: SQLNode
+    expr: SQLNodeList
+    type: Optional[SQLType]
     nulls: Optional[str]
     order_limit_offset: Optional[SQLOrderLimitOffset]
     analytic: Optional[SQLNode]
@@ -113,6 +142,8 @@ class SQLArrayAgg(SQLExpr):
 
     def sqlf(self, compact):
         lines = [TB('ARRAY_AGG(')]
+        if self.type:
+            lines.append(self.type.sqlf(compact))
         if self.is_distinct:
             lines.append(TB('DISTINCT '))
         lines.append(self.expr.sqlf(True))
@@ -135,6 +166,8 @@ class SQLArrayAgg(SQLExpr):
             return compact_sql
 
         stack = [TB('ARRAY_AGG(')]
+        if self.type:
+            stack.append(self.type.sqlf(compact))
         indent = []
         if self.is_distinct:
             indent.append(
@@ -167,22 +200,38 @@ class SQLArrayAgg(SQLExpr):
 
         lex.expect('(')
 
-        is_distinct = bool(lex.consume('DISTINCT'))
-
-        expr = SQLExpr.parse(lex)
-
+        type : SQLType = None
+        is_distinct = False
         nulls = None
-        if lex.consume('IGNORE'):
-            nulls = 'IGNORE'
-            lex.expect('NULLS')
-        elif lex.consume('RESPECT'):
-            nulls = 'RESPECT'
-            lex.expect('NULLS')
+        order_limit_offset = None
+        analytic = None
 
-        order_limit_offset = SQLOrderLimitOffset.consume(lex)
+        if lex.peek('STRUCT'):
+            type = SQLStruct.consume(lex)
+            lex.expect('(')
+            exprs : List[SQLExpr] = []
+            while True:
+                exprs.append(SQLExpr.parse(lex))
+                if lex.consume(')'):
+                    break
+                lex.expect(',')
+            expr = SQLStructOp(SQLNodeList(exprs))
+        else:
+            is_distinct = bool(lex.consume('DISTINCT'))
 
-        analytic = SQLAnalytic.consume(lex)
+            expr = SQLExpr.parse(lex)
 
+            nulls = None
+            if lex.consume('IGNORE'):
+                nulls = 'IGNORE'
+                lex.expect('NULLS')
+            elif lex.consume('RESPECT'):
+                nulls = 'RESPECT'
+                lex.expect('NULLS')
+
+            order_limit_offset = SQLOrderLimitOffset.consume(lex)
+
+            analytic = SQLAnalytic.consume(lex)
         lex.expect(')')
 
         offset = None
@@ -193,7 +242,7 @@ class SQLArrayAgg(SQLExpr):
             lex.consume(')')
             lex.expect(']')
 
-        return SQLArrayAgg(is_distinct, expr, nulls,
+        return SQLArrayAgg(is_distinct, expr, type, nulls,
                            order_limit_offset, analytic, offset)
 
 

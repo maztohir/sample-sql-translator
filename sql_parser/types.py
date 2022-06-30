@@ -25,6 +25,7 @@ from typing import List
 from rfmt.blocks import LineBlock as LB
 from rfmt.blocks import TextBlock as TB
 from rfmt.blocks import WrapBlock as WB
+from rfmt.blocks import StackBlock as SB
 
 from .node import SQLNode
 from .node import SQLNodeList
@@ -161,7 +162,7 @@ class SQLStruct(SQLType):
             )
         return LB([
             TB('STRUCT<'),
-            WB(fields),
+            SB(fields),
             TB('>')
         ])
 
