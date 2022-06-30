@@ -275,6 +275,9 @@ class SQLStringAgg(SQLExpr):
 
     @staticmethod
     def consume(lex) -> 'Optional[SQLStringAgg]':
+        if lex.peek('STRING_AGG') or lex.peek('SPLIT'):
+            if not lex.peek('('):
+                return None
         name = lex.consume('STRING_AGG') or lex.consume('SPLIT')
         if not name:
             return None
