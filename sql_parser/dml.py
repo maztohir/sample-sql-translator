@@ -89,13 +89,13 @@ class SQLInsert(SQLDML):
 
         table = SQLNamedTable.parse(lex, is_write=True)
 
-        lex.expect('(')
+        lex.consume('(')
 
         # It's possible to have a SQL statement in here.
         # .. this is with an implicit column list.
         query = SQLQuery.consume(lex)
         if query:
-            lex.expect(')')
+            lex.consume(')')
             return SQLInsert(table, None, query)
 
         # Pull out the values
