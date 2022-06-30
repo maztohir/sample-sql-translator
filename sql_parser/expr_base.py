@@ -195,10 +195,8 @@ class SQLArrayAgg(SQLExpr):
 
     @staticmethod
     def consume(lex) -> 'Optional[SQLArrayAgg]':
-        if not lex.consume('ARRAY_AGG'):
+        if not lex.consume(['ARRAY_AGG', '(']):
             return None
-
-        lex.expect('(')
 
         type : SQLType = None
         is_distinct = False
