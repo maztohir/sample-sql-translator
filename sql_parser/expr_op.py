@@ -54,12 +54,10 @@ class SQLBiOp(SQLExpr):
         right_expr = self.right.sqlf(False)
         left_expr = self.left.sqlf(False)
 
-        return CB([
-            compact_sql, SB([
+        return SB([
                 LB([left_expr, TB(' '), TB(self.sql_op)]),
                 right_expr
             ])
-        ])
 
     @staticmethod
     def parse(lex):
