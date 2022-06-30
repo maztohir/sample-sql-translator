@@ -324,15 +324,11 @@ class SQLStringAgg(SQLExpr):
 
     @staticmethod
     def consume(lex) -> 'Optional[SQLStringAgg]':
-        if lex.peek('STRING_AGG') or lex.peek('SPLIT'):
-            if not lex.peek('('):
-                return None
-        name = lex.consume('STRING_AGG') or lex.consume('SPLIT')
-        if not name:
+        function_consumed = lex.consume(['STRING_AGG', '(']) or lex.consume(['SPLIT', '('])
+        if not function_consumed:
             return None
 
-        lex.expect('(')
-
+        name = function_consumed[0]
         is_distinct = bool(lex.consume('DISTINCT'))
 
         expr = SQLExpr.parse(lex)
