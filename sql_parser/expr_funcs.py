@@ -118,9 +118,9 @@ class SQLCount(SQLCustomFuncs):
 
     @staticmethod
     def consume(lex) -> 'Optional[SQLCount]':
-        if not lex.consume('COUNT'):
+        if not lex.consume(['COUNT', '(']):
             return None
-        lex.expect('(')
+        # lex.expect('(')
         isdistinct = bool(lex.consume('DISTINCT'))
         expr = SQLExpr.parse(lex)
         lex.expect(')')
