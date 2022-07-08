@@ -482,7 +482,7 @@ class Refactor:
     def _get_column_type_knowledge(self, tables:dict):
         column_type_knowledge = {}
         for table, alias in tables.items():
-            if table not in self._knowledge.keys():
+            if table not in self._knowledge.keys() or ('column_type_knowledge' not in self._knowledge[table].keys()):
                 continue
             column_type_knowledge_from_table = copy.copy(self._knowledge[table]['column_type_knowledge'])
             column_type_knowledge.update(column_type_knowledge_from_table)
