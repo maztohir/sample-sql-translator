@@ -10,7 +10,7 @@ from sql_parser.types import SQLConcreteType
 from sql_parser import parse
 
 import copy
-
+import re
 
 
 
@@ -22,6 +22,7 @@ class Refactor:
     def __init__(self, knowledge:dict):
         self._knowledge = knowledge
         self.parsed = []
+        self.declare_header = ""
 
     def result(self):
         if self.parsed:
@@ -29,6 +30,7 @@ class Refactor:
             for parsed in self.parsed[:-1]:
                 sql += '{}\n;\n\n'.format(parsed.as_sql())
             sql += self.parsed[-1].as_sql()
+            sql = self.declare_header + '\n\n' + sql
             return sql
 
     def refactor(self, sql, parse_only=False):
@@ -38,6 +40,9 @@ class Refactor:
         error = None
         for command in sql_commands:
             if command in ('', '\n'):
+                continue
+            if re.match(r'\s*(DECLARE|declare)', command) or re.match(r'\s*(SET|set)', command):
+                self.declare_header += command + ';'
                 continue
             try:
                 command = prev_command + command
