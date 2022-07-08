@@ -16,6 +16,12 @@ class TestRefactor(unittest.TestCase):
                                 'column_2' : 'new_column_2',
                                 'column_3' : 'new_column_3',
                             },
+                            'column_type_knowledge':
+                            {
+                                'new_column_1': 'INTEGER',
+                                'new_column_2': 'column_type_2',
+                                'new_column_3': 'column_type_3'
+                            },
                             'preserved' : False
                         },
                         'table_b':
@@ -520,6 +526,21 @@ class TestRefactor(unittest.TestCase):
         )
         SELECT column_1, column_2
         FROM ta
+        """
+
+        self._assert_equal_sql(sql, reference)
+    
+    def test_column_type(self):
+        sql = """
+        SELECT column_1, column_0
+        FROM table_a
+        """
+
+        reference = """
+        SELECT 
+            CAST(new_column_1 as INTEGER) AS column_1, 
+            column_0
+        FROM new_table_a
         """
 
         self._assert_equal_sql(sql, reference)
