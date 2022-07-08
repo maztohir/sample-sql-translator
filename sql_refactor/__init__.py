@@ -1,13 +1,17 @@
 from sql_parser import query
 from sql_parser.dml import SQLCreate
+from sql_parser.expr_funcs import SQLCAST
 from sql_parser.ident import SQLIdentifier, SQLIdentifierPath, SQLWildcardPath
 from sql_parser.query import SQLAlias, SQLNamedTable
 from sql_parser.node import SQLNode, SQLNodeList
 from sql_parser.query_impl import SQLField, SQLFrom, SQLJoin, SQLOrderedQuery, SQLSelect, SQLSetOp, SQLSubSelect, SQLWithSelect
 from sql_parser.lexer import ParsingError
+from sql_parser.types import SQLConcreteType
 from sql_parser import parse
 
 import copy
+
+
 
 
 class Refactor:
@@ -313,6 +317,7 @@ class Refactor:
                     break
             
             column_knowledge = self._get_column_knowledge(relevant_tables)
+            column_type_knowledge = self._get_column_type_knowledge(relevant_tables)
 
             old_column_name = parsed.expr.names[-1].value
 
@@ -322,8 +327,14 @@ class Refactor:
                 
             new_column_name_path = column_knowledge[old_column_name].split('.')
             new_column_name = new_column_name_path[-1]
+
             new_column_name_identifier_path = [SQLIdentifier(name) for name in new_column_name_path]
             parsed.expr.names = SQLNodeList(new_column_name_identifier_path)
+
+            if old_column_name in (column_type_knowledge.keys()):
+                new_column_type = column_type_knowledge[old_column_name]
+                parsed.expr = SQLCAST(name='CAST', expr=SQLIdentifierPath(parsed.expr.names), type=SQLConcreteType(new_column_type))
+               
 
             # add alias for column
             if parsed.alias is None:
@@ -467,3 +478,13 @@ class Refactor:
             column_knowledge.update(column_knowledge_from_table)
             
         return column_knowledge
+    
+    def _get_column_type_knowledge(self, tables:dict):
+        column_type_knowledge = {}
+        for table, alias in tables.items():
+            if table not in self._knowledge.keys():
+                continue
+            column_type_knowledge_from_table = copy.copy(self._knowledge[table]['column_type_knowledge'])
+            column_type_knowledge.update(column_type_knowledge_from_table)
+            
+        return column_type_knowledge
