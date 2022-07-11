@@ -1,5 +1,11 @@
 # Examples
 
+## SQL Refactor
+
+```
+/sql.py --refactor examples/refactor/*.sql --map_knowledge examples/refactor/knowledge.json --output refactored.sql
+```
+
 ## SQL Rewriter
 
 ```
