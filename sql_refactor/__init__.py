@@ -338,7 +338,8 @@ class Refactor:
 
             if old_column_name in (column_type_knowledge.keys()):
                 new_column_type = column_type_knowledge[old_column_name]
-                parsed.expr = SQLCAST(name='CAST', expr=SQLIdentifierPath(parsed.expr.names), type=SQLConcreteType(new_column_type))
+                if new_column_type:
+                    parsed.expr = SQLCAST(name='CAST', expr=SQLIdentifierPath(parsed.expr.names), type=SQLConcreteType(new_column_type))
                
 
             # add alias for column
