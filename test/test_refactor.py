@@ -69,9 +69,9 @@ class TestRefactor(unittest.TestCase):
                             },
                             'column_type_knowledge':
                             {
-                                'new_column_1': 'INTEGER',
-                                'new_column_2': 'column_type_2',
-                                'new_column_3': 'column_type_3'
+                                'column_1': 'INTEGER',
+                                'column_2': 'column_type_2',
+                                'column_3': 'column_type_3'
                             },
                             'preserved' : False
                         },
