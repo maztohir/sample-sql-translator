@@ -86,6 +86,10 @@ class SQLNamedTable(SQLTableSource):
     @staticmethod
     def parse(lex, is_write=False) -> 'SQLNamedTable':
         table_name = SQLIdentifierPath.parse(lex)
+        while lex.consume('-'):
+            next_table_name = SQLIdentifierPath.parse(lex)
+            if next_table_name:
+                table_name.names[0].value += '-' + '.'.join(next_name.value for next_name in next_table_name.names)
         alias = SQLAlias.consume(lex)
         return SQLNamedTable(table_name, alias, is_write)
 

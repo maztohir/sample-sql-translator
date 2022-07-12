@@ -100,6 +100,7 @@ class SQLBool(SQLConstant):
 class SQLString(SQLConstant):
     value: str
     flag: Optional[str] = None
+    quotechar: Optional[str] = "'"
     """SQLString - basic string.
 
     Attributes:
@@ -116,15 +117,18 @@ class SQLString(SQLConstant):
         for escape_char in SQLString.ESCAPE_CHARS:
             out_string = out_string.replace(escape_char, "\\" + escape_char)
 
-        return TB('{}\'{}\''.format(
-            self.flag or '',
-            out_string,
+        return TB('{}{}{}{}'.format(
+            self.flag or '', self.quotechar,
+            out_string, self.quotechar
         ))
 
     @staticmethod
-    def consume(lex) -> 'Optional[SQLString]':
+    def consume(lex, quotechar=None) -> 'Optional[SQLString]':
         sql_str = lex.consume_string()
         if not sql_str:
             return None
+        if quotechar:
+            return SQLString(sql_str[0], sql_str[1], quotechar=quotechar)
+        else:
+            return SQLString(sql_str[0], sql_str[1])
 
-        return SQLString(sql_str[0], sql_str[1])

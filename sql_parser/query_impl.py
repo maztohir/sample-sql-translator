@@ -291,6 +291,8 @@ class SQLSelect(SQLQuery):
             from_consumed = lex.consume('FROM')
             if from_consumed:
                 break
+            if lex.peek_end() or lex.peek(')'):
+                break
 
         from_tables = (from_consumed or lex.consume('FROM')) and SQLFrom.parse(lex)
         where_expr = lex.consume('WHERE') and SQLExpr.parse(lex)
@@ -545,7 +547,7 @@ class SQLJoin(SQLNode):
             if expr.sql_op == '=':
                 left = expr.left
                 names = left.names   
-                left.names = SQLNodeList([alias.alias]) + names
+                left.names = names if alias is None else (SQLNodeList([alias.alias]) + names)
                 break
             elif expr.sql_op == 'AND':
                 right_expr = expr.right

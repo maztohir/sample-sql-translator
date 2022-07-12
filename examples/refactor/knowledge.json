@@ -1,0 +1,60 @@
+{
+    "table_a":
+    {
+        "new_table" : "new_table_a",
+        "column_knowledge":
+        {
+            "column_1" : "new_column_1",
+            "column_2" : "new_column_2",
+            "column_3" : "new_column_3"
+        },
+        "preserved" : false
+    },
+    "table_b":
+    {
+        "new_table" : "new_table_b",
+        "column_knowledge":
+        {
+            "column_1" : "new_column_1b",
+            "column_2b" : "new_column_2b"
+        },
+        "preserved" : false
+    },
+    "table_c":
+    {
+        "new_table" : "new_table_c",
+        "column_knowledge":
+        {
+            "column_1c" : "new_column_1c"
+        },
+        "preserved" : false
+    },
+    "table_d":
+    {
+        "new_table" : null,
+        "column_knowledge": 
+        {
+            "column_1" : null,
+            "column_2" : null
+        },
+        "preserved" : true
+    },
+    "table_e":
+    {
+        "new_table" : "new_table_e",
+        "column_knowledge":
+        {
+            "column_0" : "new_column_0",
+            "column_1" : "new_column_1",
+            "column_2" : "new_column_2",
+            "column_3" : "new_column_3"
+        },
+        "column_type_knowledge":
+        {
+            "column_1": "INTEGER",
+            "column_2": "column_type_2",
+            "column_3": "column_type_3"
+        },
+        "preserved" : false
+    }
+}

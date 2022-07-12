@@ -5,22 +5,24 @@ from sql_parser.ident import SQLIdentifier, SQLIdentifierPath, SQLWildcardPath
 from sql_parser.query import SQLAlias, SQLNamedTable
 from sql_parser.node import SQLNode, SQLNodeList
 from sql_parser.query_impl import SQLField, SQLFrom, SQLJoin, SQLOrderedQuery, SQLSelect, SQLSetOp, SQLSubSelect, SQLWithSelect
+from sql_parser.lexer import ParsingError
 from sql_parser.types import SQLConcreteType
 from sql_parser import parse
 
 import copy
-
+import re
 
 
 
 class Refactor:
 
-    COMMENT_COLUMN_NOT_FOUND = "[WARNING] Could not find column in knowledge: {}"
+    COMMENT_COLUMN_NOT_FOUND = "[WARNING] Could not find column in knowledge: {}/{}"
     COMMENT_TABLE_NOT_FOUND = "[WARNING] Could not find table in knowledge: {}"
 
     def __init__(self, knowledge:dict):
         self._knowledge = knowledge
         self.parsed = []
+        self.declare_header = ""
 
     def result(self):
         if self.parsed:
@@ -28,18 +30,34 @@ class Refactor:
             for parsed in self.parsed[:-1]:
                 sql += '{}\n;\n\n'.format(parsed.as_sql())
             sql += self.parsed[-1].as_sql()
+            sql = self.declare_header + '\n\n' + sql
             return sql
 
     def refactor(self, sql, parse_only=False):
         self.parsed = []
         sql_commands = sql.strip('\n').split(';')
+        prev_command = ''
+        error = None
         for command in sql_commands:
             if command in ('', '\n'):
                 continue
-            parsed = parse(command)
-            self.parsed.append(parsed)
-            if not parse_only:
-                self._refactor(parsed)
+            if re.match(r'\s*(DECLARE|declare)', command) or re.match(r'\s*(SET|set)', command):
+                self.declare_header += command + ';'
+                continue
+            try:
+                command = prev_command + command
+                parsed = parse(command)
+                self.parsed.append(parsed)
+                if not parse_only:
+                    self._refactor(parsed)
+                prev_command = ''
+                error = None
+            except ParsingError as e:
+                prev_command = command + ';'
+                error = e
+        if error:
+            raise error
+
 
     def _refactor(self, parsed, tables=None):
         if isinstance(parsed, SQLWithSelect):
@@ -119,7 +137,10 @@ class Refactor:
         while True:
             if index == len(parsed.fields):
                 break
-            field = parsed.fields[index]
+            if len(parsed.fields):
+                field = parsed.fields[index]
+            else:
+                break
             
             # Wildcard
             if isinstance(field.expr, SQLWildcardPath):
@@ -172,11 +193,14 @@ class Refactor:
                             ]
                 
                 # Insert new column list from wildcard to fields
-                if index == 0:
+                if len(columns) == 0:
+                    pass
+                elif index == 0:
                     parsed.fields = SQLNodeList(columns) + parsed.fields[index+1:]
                 else:
                     parsed.fields = parsed.fields[:index] + SQLNodeList(columns) + parsed.fields[index+1:]
-                field = parsed.fields[index]
+                if len(parsed.fields):
+                    field = parsed.fields[index]
 
             # Identifier Path
             self._refactor(field, old_tables)
@@ -219,7 +243,7 @@ class Refactor:
             for field in select_statement.fields:
                 if field.alias:
                     column_knowledge[field.alias.alias.value] = None
-                else:
+                elif field.expr.names and len(field.expr.names)>0:
                     column_knowledge[field.expr.names[-1].value] = None
             additional_knowledge = {
                 table_name : {
@@ -284,6 +308,8 @@ class Refactor:
         if isinstance(parsed.expr, SQLIdentifierPath):
             if len(tables) == 0: # no tables found in knowledge
                 return
+            if isinstance(parsed.expr, SQLWildcardPath):
+                return
 
             first_name = parsed.expr.names[0].value
             relevant_tables = tables
@@ -301,7 +327,7 @@ class Refactor:
             old_column_name = parsed.expr.names[-1].value
 
             if old_column_name not in column_knowledge.keys():
-                parsed.comments.append(self.COMMENT_COLUMN_NOT_FOUND.format(old_column_name))
+                parsed.comments.append(self.COMMENT_COLUMN_NOT_FOUND.format(",".join(relevant_tables.keys()), old_column_name))
                 return
                 
             new_column_name_path = column_knowledge[old_column_name].split('.')
@@ -312,7 +338,8 @@ class Refactor:
 
             if old_column_name in (column_type_knowledge.keys()):
                 new_column_type = column_type_knowledge[old_column_name]
-                parsed.expr = SQLCAST(name='CAST', expr=SQLIdentifierPath(parsed.expr.names), type=SQLConcreteType(new_column_type))
+                if new_column_type:
+                    parsed.expr = SQLCAST(name='CAST', expr=SQLIdentifierPath(parsed.expr.names), type=SQLConcreteType(new_column_type))
                
 
             # add alias for column
@@ -334,7 +361,9 @@ class Refactor:
     def _refactor_identifier_path(self, parsed:SQLIdentifierPath, tables):
         if tables is None:
             return
-        
+        if isinstance(parsed, SQLWildcardPath):
+            return
+
         first_name = parsed.names[0].value
         relevant_tables = tables
 
@@ -441,7 +470,7 @@ class Refactor:
         for table, alias in tables.items():
             if table not in self._knowledge.keys():
                 continue
-            column_knowledge_from_table = copy.copy(self._knowledge[table]['column_knowledge'])
+            column_knowledge_from_table = dict(filter(lambda elem: elem[0] and elem[0] != '', self._knowledge[table]['column_knowledge'].items()))
             if self._knowledge[table]['preserved']:
                 column_knowledge_from_table = {
                                                 old_column : old_column
@@ -459,7 +488,7 @@ class Refactor:
     def _get_column_type_knowledge(self, tables:dict):
         column_type_knowledge = {}
         for table, alias in tables.items():
-            if table not in self._knowledge.keys():
+            if table not in self._knowledge.keys() or ('column_type_knowledge' not in self._knowledge[table].keys()):
                 continue
             column_type_knowledge_from_table = copy.copy(self._knowledge[table]['column_type_knowledge'])
             column_type_knowledge.update(column_type_knowledge_from_table)

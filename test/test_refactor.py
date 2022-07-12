@@ -1,3 +1,13 @@
+
+import os
+import sys
+  
+# directory reach
+directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+  
+# setting path
+sys.path.append(directory)
+
 import unittest
 from sql_refactor import Refactor
 
@@ -15,12 +25,6 @@ class TestRefactor(unittest.TestCase):
                                 'column_1' : 'new_column_1',
                                 'column_2' : 'new_column_2',
                                 'column_3' : 'new_column_3',
-                            },
-                            'column_type_knowledge':
-                            {
-                                'new_column_1': 'INTEGER',
-                                'new_column_2': 'column_type_2',
-                                'new_column_3': 'column_type_3'
                             },
                             'preserved' : False
                         },
@@ -52,7 +56,25 @@ class TestRefactor(unittest.TestCase):
                                 'column_2' : None,
                             },
                             'preserved' : True
-                        }
+                        },
+                        'table_e':
+                        {
+                            'new_table' : 'new_table_e',
+                            'column_knowledge':
+                            {
+                                'column_0' : 'new_column_0',
+                                'column_1' : 'new_column_1',
+                                'column_2' : 'new_column_2',
+                                'column_3' : 'new_column_3',
+                            },
+                            'column_type_knowledge':
+                            {
+                                'column_1': 'INTEGER',
+                                'column_2': 'column_type_2',
+                                'column_3': 'column_type_3'
+                            },
+                            'preserved' : False
+                        },
                     }
         self.command = Refactor(knowledge)
 
@@ -104,7 +126,7 @@ class TestRefactor(unittest.TestCase):
         reference = """
         SELECT 
             new_column_1 AS column_1, 
-            -- [WARNING] Could not find column in knowledge: column_0
+            -- [WARNING] Could not find column in knowledge: table_a/column_0
             column_0
         FROM new_table_a
         """
@@ -529,18 +551,29 @@ class TestRefactor(unittest.TestCase):
         """
 
         self._assert_equal_sql(sql, reference)
+
+    def test_date_without_bracket(self):
+        sql = """
+        SELECT date '2022-02-01'
+        """
+
+        reference = """
+        SELECT date('2022-02-01')
+        """
+
+        self._assert_equal_sql(sql, reference)
     
     def test_column_type(self):
         sql = """
         SELECT column_1, column_0
-        FROM table_a
+        FROM table_e
         """
 
         reference = """
         SELECT 
-            CAST(new_column_1 as INTEGER) AS column_1, 
-            column_0
-        FROM new_table_a
+            CAST(new_column_1 AS INTEGER) AS column_1, 
+            new_column_0 AS column_0
+        FROM new_table_e
         """
 
         self._assert_equal_sql(sql, reference)

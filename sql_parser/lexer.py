@@ -181,6 +181,11 @@ class SQLLexer:
     def expect_end(self):
         if self._pos < len(self._str):
             self.error('Expected end')
+    
+    def peek_end(self):
+        if self._pos < len(self._str):
+            return False
+        return True
 
     def consume_all_space(self):
         """Consume all space and comments.

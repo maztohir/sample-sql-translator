@@ -18,9 +18,11 @@
 
 import argparse
 import sys
+import json
 
 from sql_parser import parse
 from sql_rewrite import convert, tables, tables_to_graph, MODES
+from sql_refactor import Refactor
 
 # Define command line arguments
 argparser = argparse.ArgumentParser(description='Process SQL')
@@ -40,6 +42,11 @@ argparser.add_argument('--output',
 argparser.add_argument('sql_input',
                        type=argparse.FileType('r'), nargs='+', default=sys.stdin,
                        help='SQL Input')
+argparser.add_argument('--refactor',
+                       help='Refactor', action='store_true')
+argparser.add_argument('--map_knowledge',
+                       type=argparse.FileType('r'), nargs='+', default=sys.stdin,
+                       help='Map Knowledge')
 
 # Parse arguments
 args = argparser.parse_args()
@@ -47,6 +54,15 @@ args = argparser.parse_args()
 dep_tables = set()
 
 for sql_input in args.sql_input:
+    if args.refactor:
+        knowledge = json.load(args.map_knowledge[0])
+        refactor = Refactor(knowledge)
+        refactor.refactor(sql_input.read())
+        result = refactor.result()
+        print(result)
+        args.output.write(result)
+        continue
+
     parsed = parse(sql_input.read())
 
     # Rewrite the query

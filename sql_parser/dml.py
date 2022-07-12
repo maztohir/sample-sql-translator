@@ -46,7 +46,8 @@ class SQLDML(SQLNode):
         return (SQLInsert.consume(lex) or
                 SQLUpdate.consume(lex) or
                 SQLDelete.consume(lex) or
-                SQLCreate.consume(lex))
+                SQLCreate.consume(lex) or
+                SQLMerge.consume(lex))
 
 
 @dataclass(frozen=True)
@@ -89,13 +90,13 @@ class SQLInsert(SQLDML):
 
         table = SQLNamedTable.parse(lex, is_write=True)
 
-        lex.expect('(')
+        lex.consume('(')
 
         # It's possible to have a SQL statement in here.
         # .. this is with an implicit column list.
         query = SQLQuery.consume(lex)
         if query:
-            lex.expect(')')
+            lex.consume(')')
             return SQLInsert(table, None, query)
 
         # Pull out the values
@@ -435,4 +436,167 @@ class SQLCreate(SQLDML):
 
         return SQLCreate(clause, table, columns, options, query)
 
+@dataclass(frozen=False)
+class SQLMergeDelete(SQLDML):
+
+    def sqlf(self, compact):
+       return LB([TB('DELETE')])
+
+    @staticmethod
+    def consume(lex) -> 'Optional[SQLMergeDelete]':
+        if lex.consume('DELETE'):
+            return SQLMergeDelete()
+
+@dataclass(frozen=True)
+class SQLMergeInsert(SQLDML):
+    cols : Optional[SQLNodeList]
+    values : Optional[SQLNodeList]
+
+    def sqlf(self, compact):
+        stack = [TB('INSERT')]
+        if not self.cols and not self.values:
+            stack.append(TB('ROW'))
+        else:
+            stack = [
+                LB(stack + [TB('(')]),
+                IB(
+                    SB(with_commas(compact, self.cols, tail=')')),
+                ),
+                TB('VALUES ('),
+                IB(
+                    SB(with_commas(compact, self.values, tail=')')),
+                )
+            ]
+        return SB(stack)
+        
+
+    @staticmethod
+    def consume(lex) -> 'Optional[SQLMergeInsert]':
+        if not lex.consume('INSERT'):
+            return None
+        if lex.consume('ROW'):
+            return SQLMergeInsert(None, None)
+        cols = []
+        if lex.consume('('):
+            while True:
+                cols.append(SQLIdentifierPath.parse(lex))
+                if not lex.consume(','):
+                    break
+            lex.expect(')')
+        values : List[SQLExpr] = []
+        if lex.consume(['VALUES', '(']):
+            while True:
+                value = SQLExpr.parse(lex)
+                values.append(value)
+                if lex.consume(')'):
+                    break
+                lex.expect(',')
+            return SQLMergeInsert(SQLNodeList(cols), SQLNodeList(values))
+        return None
+
+
+@dataclass(frozen=True)
+class SQLMergeUpdate(SQLDML):
+    update_fields : Optional[SQLNodeList]
+    update_exprs : Optional[SQLNodeList]
+
+    def sqlf(self, compact):
+        updatestmt = [
+            TB('UPDATE SET')
+        ]
+        for i in range(len(self.update_fields)):
+            field = self.update_fields[i]
+            expr = self.update_exprs[i]
+            if i == len(self.update_fields)-1:
+                updatestmt.append(LB([
+                    field.sqlf(False), TB(' = '), expr.sqlf(False)
+                ]))
+            else:
+                updatestmt.append(LB([
+                    field.sqlf(False), TB(' = '), expr.sqlf(False),
+                    TB(',')
+                ]))
+        return SB(updatestmt)
+        
+
+    @staticmethod
+    def consume(lex) -> 'Optional[SQLMergeUpdate]':
+        if not lex.consume('UPDATE'):
+            return None
+        lex.expect('SET')
+
+        update_fields = []
+        update_exprs = []
+        while True:
+            update_fields.append(SQLIdentifierPath.parse(lex))
+            lex.expect('=')
+            update_exprs.append(SQLExpr.parse(lex))
+            if not lex.consume(','):
+                break
+        return SQLMergeUpdate(SQLNodeList(update_fields),
+                         SQLNodeList(update_exprs))
+
+@dataclass(frozen=True)
+class SQLMerge(SQLDML):
+    table: SQLNamedTable
+    source: SQLTableSource
+    merge_condition: SQLExpr
+    matched_clauses: List[SQLExpr]
+    merge_clauses: List[SQLDML]
+
+    def sqlf(self, compact):
+        stack = [TB('MERGE INTO '), self.table.sqlf(compact)]
+        stack = [
+            SB([LB(stack),
+            LB([TB('USING')])]),
+            self.source.sqlf(compact),
+            LB([TB('\nON ')]),
+            self.merge_condition.sqlf(False)
+        ]
+        clauses = []
+        for matched_clause, merge_clause in zip(self.matched_clauses, self.merge_clauses):
+            clause = SB([
+                LB([TB('WHEN '),
+                matched_clause.sqlf(compact),
+                TB(' THEN ')]),
+                IB(merge_clause.sqlf(compact))
+            ])
+            clauses.append(clause)
+        return SB([LB(stack)] + clauses)
+
+    @staticmethod
+    def consume(lex) -> 'Optional[SQLMerge]':
+        if not lex.consume('MERGE'):
+            return None
+
+        lex.consume('INTO')
+
+        table = SQLNamedTable.parse(lex, is_write=True)
+
+        lex.consume('USING')
+        
+        source = SQLTableSource.parse(lex)
+
+        merge_condition : SQLExpr = None
+        if lex.consume('ON'):
+            merge_condition = SQLExpr.parse(lex)
+
+        if lex.consume('WHEN'):
+            matched_clauses : List[SQLExpr] = []
+            merge_clauses : List[SQLDML] = []
+            while True:
+                matched_clause = SQLExpr.parse(lex)
+                matched_clauses.append(matched_clause)
+                lex.expect('THEN')
+                merge_clause = SQLMergeDelete.consume(lex) or \
+                                SQLMergeInsert.consume(lex) or \
+                                SQLMergeUpdate.consume(lex)
+                merge_clauses.append(merge_clause)
+                if not lex.consume('WHEN'):
+                    break
+        
+        return SQLMerge(table, source, merge_condition, matched_clauses, merge_clauses)
+                
+        lex.error('Insert with explicit values unsupported')
+        return None
 

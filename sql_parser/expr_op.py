@@ -54,12 +54,10 @@ class SQLBiOp(SQLExpr):
         right_expr = self.right.sqlf(False)
         left_expr = self.left.sqlf(False)
 
-        return CB([
-            compact_sql, SB([
+        return SB([
                 LB([left_expr, TB(' '), TB(self.sql_op)]),
                 right_expr
             ])
-        ])
 
     @staticmethod
     def parse(lex):
@@ -146,8 +144,14 @@ class SQLBiOp(SQLExpr):
                 expr = SQLBetween(inverted + 'BETWEEN',
                                   expr, expr_l, expr_r)
             elif lex.consume('IN'):
-                lex.expect('(')
-                in_query = SQLQuery.consume(lex)
+                if lex.consume(['UNNEST', '(']):
+                    from .expr_funcs import SQLFuncExpr
+                    from .ident import SQLIdentifier, SQLIdentifierPath
+                    arg = SQLFuncExpr.parse(lex) or SQLIdentifierPath.parse(lex) 
+                    in_query = SQLFuncExpr(SQLNodeList([SQLIdentifier('UNNEST')]), SQLNodeList([arg]))
+                else:
+                    lex.expect('(')
+                    in_query = SQLQuery.consume(lex)
                 if in_query:
                     lex.expect(')')
                     return SQLINSQL(inverted + 'IN', expr, in_query)
@@ -342,10 +346,11 @@ class SQLIN(SQLExpr):
     def sqlf(self, compact):
         in_vals = []
         for arg in self.args[:-1]:
-            in_vals.append(LB([arg.sqlf(True), TB(',')]))
+            in_vals += [arg.sqlf(True), TB(',')]
         in_vals.append(self.args[-1].sqlf(True))
+        in_vals = [LB(in_vals)]
         sql_op = TB(' ' + self.sql_op + ' (')
-        compact_sql = LB([self.iexpr.sqlf(True), sql_op] + in_vals +
+        compact_sql = LB([self.iexpr.sqlf(True), sql_op] + in_vals + 
                          [TB(')')])
         if compact:
             return compact_sql
