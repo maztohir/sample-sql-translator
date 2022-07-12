@@ -84,7 +84,7 @@ class SQLFunction(SQLNode):
                     optionf.append(LB([option.sqlf(compact), TB(',')]))
                 optionf.append(self.options[-1].sqlf(compact))
                 optionf.append(TB(')'))
-            stack.append(TB('LANGUAGE js AS'))
+            stack.append(TB('LANGUAGE js AS '))
             if len(optionf):
                 stack.append(IB(LB([
                     self.impl.sqlf(compact), WB(optionf, sep=' '),

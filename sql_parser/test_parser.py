@@ -74,7 +74,7 @@ class TestParser(unittest.TestCase):
                         'SELECT F;',
                         'CREATE TEMPORARY FUNCTION stuff(x TYPE)'
                         'RETURNS TYPE LANGUAGE '
-                        'js AS \' javascript stuff \';SELECT F')
+                        'js AS"""javascript stuff""";SELECT F')
 
     def test_order_by(self):
         self.assert_sql('SELECT x FROM t ORDER BY tx,tb ASC',
